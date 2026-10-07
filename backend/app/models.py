@@ -1,6 +1,7 @@
 from datetime import datetime, timezone
 from typing import ClassVar, Optional
 
+from sqlalchemy import Index
 from sqlmodel import Field, Relationship, SQLModel
 
 
@@ -36,6 +37,7 @@ class Kettle(SQLModel, table=True):
     bench: int = 0
     workshop: Optional[Workshop] = Relationship(back_populates="kettles")
     cooks: list["CookLog"] = Relationship(back_populates="kettle")
+    gravity_readings: list["GravityReading"] = Relationship(back_populates="kettle")
 
 
 class CookLog(SQLModel, table=True):
@@ -45,3 +47,27 @@ class CookLog(SQLModel, table=True):
     peak_temp_c: float
     operator: str = ""
     kettle: Optional[Kettle] = Relationship(back_populates="cooks")
+
+
+class GravityReading(SQLModel, table=True):
+    """比重计读数：同锅未作废槽位号唯一（见部分唯一索引）。"""
+
+    __tablename__ = "gravityreading"
+    __table_args__ = (
+        Index(
+            "uq_gravity_kettle_slot_active",
+            "kettle_id",
+            "slot_no",
+            unique=True,
+            postgresql_where="voided_at IS NULL",
+        ),
+    )
+
+    id: Optional[int] = Field(default=None, primary_key=True)
+    kettle_id: int = Field(foreign_key="kettle.id")
+    slot_no: int = Field(index=True)
+    gravity: float
+    sampled_at: datetime
+    sampler: str = ""
+    voided_at: Optional[datetime] = Field(default=None)
+    kettle: Optional[Kettle] = Relationship(back_populates="gravity_readings")
